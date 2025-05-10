@@ -14,9 +14,16 @@ class Student(models.Model):
 
 # 1. Model for question 1: Who in your group might get all A's?
 class ExcellentCandidates(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="excellent_nominator")
-    selected_groupmates = models.ManyToManyField(Student, related_name="excellent_candidates")
-    created_at = models.DateTimeField(auto_now_add=True)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="excellent_nominator", verbose_name="So'rov yuborgan talaba")
+    selected_groupmates = models.ManyToManyField(Student, related_name="excellent_candidates", verbose_name="A'lochi deb belgilangan guruhdoshlar")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratilgan vaqti")
+
+    class Meta:
+        verbose_name = "A'lochi nomzodlar so'rovi"
+        verbose_name_plural = "A'lochi nomzodlar so'rovlari"
+
+    def __str__(self):
+        return f"{self.student.full_name} tomonidan a'lochi deb belgilanganlar"
 
 # 2. Model for reasons why those students might succeed
 class ExcellenceReason(models.Model):
@@ -34,9 +41,16 @@ class ExcellenceReason(models.Model):
 
 # 3. Model for question 3: Who might fail to pass?
 class AtRiskCandidates(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="atrisk_nominator")
-    selected_groupmates = models.ManyToManyField(Student, related_name="atrisk_candidates")
-    created_at = models.DateTimeField(auto_now_add=True)
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="atrisk_nominator", verbose_name="So'rov yuborgan talaba")
+    selected_groupmates = models.ManyToManyField(Student, related_name="atrisk_candidates", verbose_name="Xavf ostida deb belgilangan guruhdoshlar")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratilgan vaqti")
+
+    class Meta:
+        verbose_name = "Xavf ostidagi nomzodlar so'rovi"
+        verbose_name_plural = "Xavf ostidagi nomzodlar so'rovlari"
+
+    def __str__(self):
+        return f"{self.student.full_name} tomonidan xavf ostida deb belgilanganlar"
 
 # 4. Model for reasons why those students might fail
 class AtRiskReason(models.Model):
