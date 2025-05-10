@@ -7,16 +7,29 @@ from .serializers import (
 from rest_framework import viewsets
 from rest_framework.decorators import api_view
 class ExcellentCandidatesViewSet(viewsets.ModelViewSet):
-    queryset = ExcellentCandidates.objects.all()
     serializer_class = ExcellentCandidatesSerializer
+
+    def get_queryset(self):
+        queryset = ExcellentCandidates.objects.all()
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            # Faqat shu student tomonidan tanlanganlarni ko'rsatmaslik uchun
+            queryset = queryset.exclude(student__student_id=student_id)
+        return queryset
 
 class ExcellenceReasonViewSet(viewsets.ModelViewSet):
     queryset = ExcellenceReason.objects.all()
     serializer_class = ExcellenceReasonSerializer
 
 class AtRiskCandidatesViewSet(viewsets.ModelViewSet):
-    queryset = AtRiskCandidates.objects.all()
     serializer_class = AtRiskCandidatesSerializer
+
+    def get_queryset(self):
+        queryset = AtRiskCandidates.objects.all()
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            queryset = queryset.exclude(student__student_id=student_id)
+        return queryset
 
 class AtRiskReasonViewSet(viewsets.ModelViewSet):
     queryset = AtRiskReason.objects.all()
