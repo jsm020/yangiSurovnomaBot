@@ -4,7 +4,23 @@ from .models import (
 from .serializers import (
     StudentSerializer, ExcellentCandidatesSerializer, ExcellenceReasonSerializer, AtRiskCandidatesSerializer, AtRiskReasonSerializer
 )
+from rest_framework import viewsets
 from rest_framework.decorators import api_view
+class ExcellentCandidatesViewSet(viewsets.ModelViewSet):
+    queryset = ExcellentCandidates.objects.all()
+    serializer_class = ExcellentCandidatesSerializer
+
+class ExcellenceReasonViewSet(viewsets.ModelViewSet):
+    queryset = ExcellenceReason.objects.all()
+    serializer_class = ExcellenceReasonSerializer
+
+class AtRiskCandidatesViewSet(viewsets.ModelViewSet):
+    queryset = AtRiskCandidates.objects.all()
+    serializer_class = AtRiskCandidatesSerializer
+
+class AtRiskReasonViewSet(viewsets.ModelViewSet):
+    queryset = AtRiskReason.objects.all()
+    serializer_class = AtRiskReasonSerializer
 @api_view(["GET", "POST"])
 def excellent_candidates_list(request):
     if request.method == "GET":
