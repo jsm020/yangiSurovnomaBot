@@ -2,6 +2,51 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 # API for updating Student's telegram_id by student_id
+from django.shortcuts import render
+from .models import ExcellentCandidates,Student
+from django.db.models import Count
+
+from django.db.models import Count
+from collections import Counter
+from .models import Student, ExcellentCandidates, ExcellenceReason
+
+def student_reasons_report(request):
+    students = Student.objects.annotate(
+        selected_count=Count('excellent_candidates')
+    )
+
+    # Barcha sabab kalitlarini olamiz
+    all_reason_keys = [key for key, _ in ExcellenceReason.REASON_CHOICES]
+    reason_dict = dict(ExcellenceReason.REASON_CHOICES)
+
+    student_data = []
+
+    for student in students:
+        # Shu student qaysi so‘rovda tanlangan
+        candidates = ExcellentCandidates.objects.filter(selected_groupmates=student)
+
+        # Ular bilan bog‘liq sabablar
+        reasons_qs = ExcellenceReason.objects.filter(candidate__in=candidates)
+
+        # Har bir sababdan nechtaligini sanash
+        reason_counter = Counter(reasons_qs.values_list('reason', flat=True))
+
+        # Har bir sabab uchun 0 yoki haqiqiy sonni qo‘yamiz
+        full_reason_stats = {
+            reason_dict[key]: reason_counter.get(key, 0)
+            for key in all_reason_keys
+        }
+
+        student_data.append({
+            'student': student,
+            'selected_count': student.selected_count,
+            'reasons': full_reason_stats,
+        })
+
+    return render(request, 'report/student_reasons_report.html', {
+        'student_data': student_data
+    })
+
 class StudentTelegramIdUpdateView(APIView):
     def post(self, request):
         student_id = request.data.get("student_id")

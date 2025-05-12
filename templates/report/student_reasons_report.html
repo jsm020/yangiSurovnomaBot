@@ -1,0 +1,21 @@
+<h2>A'lochi deb tanlanganlar va sabablar</h2>
+<table border="1">
+    <tr>
+        <th>F.I.Sh.</th>
+        <th>Tanlangan soni</th>
+        <th>Sabablar</th>
+    </tr>
+    {% for row in student_data %}
+        <tr>
+            <td>{{ row.student.full_name }}</td>
+            <td>{{ row.selected_count }}</td>
+            <td>
+                <ul>
+                    {% for reason, count in row.reasons.items %}
+                        <li>{{ reason }} ({{ count }} marta)</li>
+                    {% endfor %}
+                </ul>
+            </td>
+        </tr>
+    {% endfor %}
+</table>
