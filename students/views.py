@@ -44,8 +44,6 @@ class StudentTelegramIdUpdateView(APIView):
             student.telegram_id = telegram_id
             if username is not None:
                 student.username = username
-            if full_name is not None:
-                student.full_name = full_name
             student.save()
             return Response(StudentSerializer(student).data)
         except Student.DoesNotExist:

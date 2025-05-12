@@ -1,5 +1,5 @@
 import asyncio
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, types, F # type: ignore
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import aiohttp
 import os
 
-API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7912014686:AAF0oVi8Yma9qr4IiuSMEQ2gkCRDJ8wr5BI")
 DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000/api/students/")
 
 bot = Bot(token=API_TOKEN)
