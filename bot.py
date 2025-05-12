@@ -52,35 +52,39 @@ async def send_groupmates_keyboard(message, groupmates):
         inline_keyboard=[
             [InlineKeyboardButton(text=f"{g['full_name']}", callback_data=f"select_{g['student_id']}")]
             for g in groupmates
-        ]
+        ] + [[InlineKeyboardButton(text="KEYINGI", callback_data="next_stage")]]
     )
     await message.answer("Guruhdoshlaringizdan kimlar barcha nazorat ishlaridan a'lo (5) baho olishi mumkin deb o'ylaysiz?", reply_markup=keyboard)
 
+
+# Inline button orqali kursdosh tanlash
 @dp.callback_query(F.data.startswith("select_"), SurveyStates.select_excellent_groupmates)
 async def select_groupmate_callback(call: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     groupmates = data.get("groupmates", [])
     selected = data.get("selected", [])
     student_id = call.data.replace("select_", "")
-    # Tanlangan talabani selected ro'yxatiga qo'shish
     if student_id not in selected:
         selected.append(student_id)
-    # Inline buttondan tanlangan talabani olib tashlash
     groupmates = [g for g in groupmates if g["student_id"] != student_id]
     await state.update_data(groupmates=groupmates, selected=selected)
-    if groupmates:
-        await call.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=f"{g['full_name']}", callback_data=f"select_{g['student_id']}")]
-                for g in groupmates
-            ]
-        ))
-    else:
-        await call.message.edit_reply_markup(reply_markup=None)
-        # POST so'rovi orqali tanlanganlarni bazaga saqlash
-        all_data = await state.get_data()
-        await post_excellent_candidates(call, all_data)
-        await call.message.answer("Tanlov yakunlandi! (Keyingi bosqich uchun buyruq yoki tugma chiqadi)")
+    # Inline buttonlarni yangilash (KEYINGI tugmasi doim oxirida qoladi)
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=f"{g['full_name']}", callback_data=f"select_{g['student_id']}")]
+            for g in groupmates
+        ] + [[InlineKeyboardButton(text="KEYINGI", callback_data="next_stage")]]
+    )
+    await call.message.edit_reply_markup(reply_markup=keyboard)
+    await call.answer()
+
+# "KEYINGI" tugmasi bosilganda POST qilish yoki bo'sh yuborish
+@dp.callback_query(F.data == "next_stage", SurveyStates.select_excellent_groupmates)
+async def next_stage_callback(call: types.CallbackQuery, state: FSMContext):
+    all_data = await state.get_data()
+    await call.message.edit_reply_markup(reply_markup=None)
+    await post_excellent_candidates(call, all_data)
+    await call.message.answer("Tanlov yakunlandi! (Keyingi bosqich uchun buyruq yoki tugma chiqadi)")
     await call.answer()
 
 async def post_excellent_candidates(call, data):
