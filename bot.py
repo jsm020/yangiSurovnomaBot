@@ -89,18 +89,20 @@ async def next_stage_callback(call: types.CallbackQuery, state: FSMContext):
 
 async def post_excellent_candidates(call, data):
     """
-    Tanlangan guruhdoshlarni ExcellentCandidates API'ga POST qilish
+    Tanlangan guruhdoshlarni ExcellentCandidates API'ga POST qilish (ViewSet router uchun mos)
     """
     student_id = data.get("student_id")
     selected = data.get("selected", [])
-    if not student_id or not selected:
+    if not student_id:
         return
-    # Student bazadagi id sini olish
     async with aiohttp.ClientSession() as session:
         # Student obyektini olish (student_id orqali)
         async with session.get(f"{DJANGO_API_URL}?student_id={student_id}") as resp:
             if resp.status == 200:
                 students = await resp.json()
+                # ViewSet router uchun natija {'results': [...]} bo'lishi mumkin
+                if isinstance(students, dict) and "results" in students:
+                    students = students["results"]
                 if students and isinstance(students, list):
                     student_db_id = students[0]["id"]
                 else:
@@ -113,6 +115,8 @@ async def post_excellent_candidates(call, data):
             async with session.get(f"{DJANGO_API_URL}?student_id={sid}") as resp:
                 if resp.status == 200:
                     students = await resp.json()
+                    if isinstance(students, dict) and "results" in students:
+                        students = students["results"]
                     if students and isinstance(students, list):
                         groupmate_ids.append(students[0]["id"])
         # ExcellentCandidates obyektini yaratish
