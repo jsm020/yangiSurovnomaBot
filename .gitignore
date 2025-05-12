@@ -19,3 +19,8 @@ Thumbs.db
 # Cache
 *.cache
 .cache/
+
+
+
+baza.xlsx
+~$*.xlsx
