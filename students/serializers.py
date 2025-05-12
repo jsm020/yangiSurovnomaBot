@@ -8,6 +8,7 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = [
+            'id',
             "student_id",
             "full_name",
             "faculty",
