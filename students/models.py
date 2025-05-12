@@ -82,7 +82,7 @@ class AtRiskReason(models.Model):
         return dict(self.REASON_CHOICES).get(self.reason, self.reason)
 
 class SurveyParticipation(models.Model):
-    student = models.OneToOneField(
+    student      = models.OneToOneField(
         "students.Student",
         on_delete=models.CASCADE,
         related_name="survey_participation"

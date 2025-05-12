@@ -48,9 +48,11 @@ class AtRiskReasonSerializer(serializers.ModelSerializer):
 # serializers.py
 class SurveyParticipationSerializer(serializers.ModelSerializer):
     class Meta:
-        model  = SurveyParticipation
-        fields = ["id", "student", "telegram_id", "started_at", "finished_at"]
-        read_only_fields = ["id", "started_at", "finished_at"]
+        model = SurveyParticipation
+        fields = '__all__'
+        extra_kwargs = {
+            'finished_at': {'required': False}
+        }
 
     def validate(self, attrs):
         student     = attrs["student"]
