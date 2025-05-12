@@ -116,6 +116,7 @@ async def process_student_id(msg: types.Message, state: FSMContext):
         participation_payload = {
             "student": student_db_id,
             "telegram_id": msg.from_user.id,
+            "finished_at": datetime.datetime.utcnow().isoformat(),
         }
         async with s.post(SURVEY_API_URL, json=participation_payload) as pr:
             if pr.status != 201:

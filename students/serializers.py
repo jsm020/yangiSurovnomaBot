@@ -50,9 +50,6 @@ class SurveyParticipationSerializer(serializers.ModelSerializer):
     class Meta:
         model = SurveyParticipation
         fields = '__all__'
-        extra_kwargs = {
-            'finished_at': {'required': False}
-        }
 
     def validate(self, attrs):
         student     = attrs["student"]
