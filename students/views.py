@@ -9,6 +9,29 @@ from django.db.models import Count
 from django.db.models import Count
 from collections import Counter
 from .models import Student, ExcellentCandidates, ExcellenceReason
+from rest_framework import generics, permissions   # DRF’ning tayyor sinflari
+from rest_framework import generics, permissions
+from .models import SurveyParticipation
+from .serializers import SurveyParticipationSerializer
+
+class SurveyParticipationView(generics.ListCreateAPIView):  # List+Create
+    serializer_class   = SurveyParticipationSerializer
+    permission_classes = [permissions.AllowAny]
+    queryset           = SurveyParticipation.objects.all()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        student_id  = self.request.query_params.get("student")      # PK
+        telegram_id = self.request.query_params.get("telegram_id")  # bigint
+
+        if student_id:
+            qs = qs.filter(student=student_id)          # <‑‑ PK bo‘yicha
+            # yoki: qs.filter(student_id=student_id)
+
+        if telegram_id:
+            qs = qs.filter(telegram_id=telegram_id)
+
+        return qs
 
 def student_reasons_report(request):
     students = Student.objects.annotate(
@@ -70,7 +93,7 @@ from .models import (
     Student, ExcellentCandidates, ExcellenceReason, AtRiskCandidates, AtRiskReason
 )
 from .serializers import (
-    StudentSerializer, ExcellentCandidatesSerializer, ExcellenceReasonSerializer, AtRiskCandidatesSerializer, AtRiskReasonSerializer
+    StudentSerializer, ExcellentCandidatesSerializer, ExcellenceReasonSerializer, AtRiskCandidatesSerializer, AtRiskReasonSerializer, SurveyParticipationSerializer
 )
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view

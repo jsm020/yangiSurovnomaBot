@@ -80,3 +80,21 @@ class AtRiskReason(models.Model):
 
     def __str__(self):
         return dict(self.REASON_CHOICES).get(self.reason, self.reason)
+
+class SurveyParticipation(models.Model):
+    student = models.OneToOneField(
+        "students.Student",
+        on_delete=models.CASCADE,
+        related_name="survey_participation"
+    )
+    telegram_id  = models.BigIntegerField(unique=True)
+    started_at   = models.DateTimeField(auto_now_add=True)
+    finished_at  = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "telegram_id"],
+                name="uniq_student_telegram"
+            )
+        ]

@@ -1,5 +1,5 @@
 from .models import (
-    Student, ExcellentCandidates, ExcellenceReason, AtRiskCandidates, AtRiskReason
+    Student, ExcellentCandidates, ExcellenceReason, AtRiskCandidates, AtRiskReason, SurveyParticipation
 )
 from rest_framework import serializers
 from .models import Student
@@ -33,7 +33,9 @@ class ExcellenceReasonSerializer(serializers.ModelSerializer):
         fields = ["id", "candidate", "reason"]
 
 class AtRiskCandidatesSerializer(serializers.ModelSerializer):
-    selected_groupmates = StudentSerializer(many=True, read_only=True)
+    selected_groupmates = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Student.objects.all()
+    )
     class Meta:
         model = AtRiskCandidates
         fields = ["id", "student", "selected_groupmates", "created_at"]
@@ -42,3 +44,20 @@ class AtRiskReasonSerializer(serializers.ModelSerializer):
     class Meta:
         model = AtRiskReason
         fields = ["id", "candidate", "reason"]
+
+# serializers.py
+class SurveyParticipationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SurveyParticipation
+        fields = ["id", "student", "telegram_id", "started_at", "finished_at"]
+        read_only_fields = ["id", "started_at", "finished_at"]
+
+    def validate(self, attrs):
+        student     = attrs["student"]
+        telegram_id = attrs["telegram_id"]
+
+        if SurveyParticipation.objects.filter(student=student).exists():
+            raise serializers.ValidationError("This student has already participated.")
+        if SurveyParticipation.objects.filter(telegram_id=telegram_id).exists():
+            raise serializers.ValidationError("This Telegram account has already participated.")
+        return attrs

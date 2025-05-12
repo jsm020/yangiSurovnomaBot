@@ -1,5 +1,6 @@
-# survey_bot.py  – 4 bosqichli so‘rovnoma
+# ──────────────── survey_bot.py – 4 bosqichli so‘rovnoma ────────────────
 import asyncio
+import datetime
 import logging
 import os
 from typing import List
@@ -11,10 +12,16 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+# ──────────────── Konstanta va tokenlar ────────────────
 API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN",
                       "7912014686:AAF0oVi8Yma9qr4IiuSMEQ2gkCRDJ8wr5BI")
 DJANGO_API_URL = os.getenv("DJANGO_API_URL",
                            "http://localhost:8000/api/students/")
+# ➕ SurveyParticipation endpointi
+SURVEY_API_URL = os.getenv(
+    "SURVEY_API_URL",
+    "http://localhost:8000/api/students/survey-participations/"
+)
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
@@ -44,6 +51,22 @@ WEAK_REASONS = [
     ("teacher_relation",  "O‘qituvchining talabaga bo‘lgan shaxsiy munosabati ta’sir qiladi"),
     ("subjective_factors","Tanish‑bilishchilik yoki boshqa subyektiv omillar ta’sir qiladi"),
 ]
+async def json_count(resp: aiohttp.ClientResponse) -> int:
+    """
+    DRF ListAPIView bo'lsa {"count": n, ...} keladi.
+    Oddiy list bo'lsa len(list) qaytadi.
+    404 yoki JSON bo'lmasa → 0.
+    """
+    if resp.status != 200:
+        return 0
+    try:
+        data = await resp.json()
+    except aiohttp.ContentTypeError:
+        return 0
+
+    if isinstance(data, dict):
+        return data.get("count", 0)
+    return len(data)            # list bo'lsa
 
 # ─────────────────── /start ───────────────────
 @dp.message(CommandStart())
@@ -57,6 +80,17 @@ async def process_student_id(msg: types.Message, state: FSMContext):
     hemis_id = msg.text.strip()
 
     async with aiohttp.ClientSession() as s:
+        # 0) allaqachon qatnashgan‑qatnashmaganini tekshirish
+        r1 = await s.get(f"{SURVEY_API_URL}?student={hemis_id}")
+        r2 = await s.get(f"{SURVEY_API_URL}?telegram_id={msg.from_user.id}")
+
+        count_student  = await json_count(r1)
+        count_telegram = await json_count(r2)
+
+        if count_student > 0 or count_telegram > 0:
+            await msg.answer("❗️ Siz (yoki ushbu HEMIS ID) so‘rovnomani allaqachon to‘ldirgansiz.")
+            return
+
         # 1) Telegram maʼlumotlarini yangilash
         payload = {
             "student_id": hemis_id,
@@ -78,6 +112,19 @@ async def process_student_id(msg: types.Message, state: FSMContext):
                 return
             groupmates = (await r.json())["groupmates"]
 
+        # 3) Participation yozuvini yaratamiz
+        participation_payload = {
+            "student": student_db_id,
+            "telegram_id": msg.from_user.id,
+        }
+        async with s.post(SURVEY_API_URL, json=participation_payload) as pr:
+            if pr.status != 201:
+                err = await pr.json()
+                await msg.answer(f"❗️ {err.get('detail', 'So‘rovnomani to‘ldirish mumkin emas.')}")
+                return
+            participation_id = (await pr.json())["id"]
+
+    # FSM ma'lumotlari
     await state.update_data(
         student_db_id=student_db_id,
         all_groupmates=groupmates,             # o‘zgarmas nusxa
@@ -87,6 +134,7 @@ async def process_student_id(msg: types.Message, state: FSMContext):
         weak_selected=[],
         weak_reasons=[],
         stage="good_groupmates",
+        participation_id=participation_id,     # ➕
     )
     await state.set_state(SurveyStates.survey)
     await send_groupmates_keyboard(
@@ -134,7 +182,10 @@ async def select_groupmate(call: types.CallbackQuery, state: FSMContext):
         selected.append(gm_id)
 
     working = [g for g in working if g["id"] != gm_id]
-    await state.update_data(work_groupmates=working, **{sel_key: selected})
+    await state.update_data(
+        work_groupmates=working,
+        **{sel_key: selected.copy()}   # <‑‑ .copy() muhim
+    )
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -206,15 +257,20 @@ async def next_reasons(call: types.CallbackQuery, state: FSMContext):
     if stage == "good_reasons":
         await call.message.edit_reply_markup(reply_markup=None)
         await post_excellence_reasons(data)
-        # guruhdoshlar ro‘yxatini qayta tiklaymiz
+
+        # good_selected ID‑larini chiqarib tashlaymiz
         all_mates = data["all_groupmates"]
+        good_ids = set(data["good_selected"])
+        remaining = [g for g in all_mates if g["id"] not in good_ids]
+
         await state.update_data(
-            work_groupmates=all_mates.copy(),
+            work_groupmates=remaining,
+            weak_selected=[],
             stage="weak_groupmates",
         )
         await send_groupmates_keyboard(
             call.message,
-            all_mates,
+            remaining,
             "Kimlar nazorat ishlarini muvaffaqiyatli topshira olmaydi deb hisoblaysiz?",
         )
 
@@ -223,6 +279,16 @@ async def next_reasons(call: types.CallbackQuery, state: FSMContext):
         await call.message.edit_reply_markup(reply_markup=None)
         await post_weak_reasons(data)
         await call.message.answer("So‘rovnoma yakunlandi! Rahmat.")
+
+        # finished_at ni belgilaymiz
+        part_id = data.get("participation_id")
+        if part_id:
+            async with aiohttp.ClientSession() as s:
+                await s.patch(
+                    f"{SURVEY_API_URL}{part_id}/",
+                    json={"finished_at": datetime.datetime.utcnow().isoformat()}
+                )
+
         await state.clear()
 
     await call.answer()
@@ -243,7 +309,6 @@ async def post_excellent_candidates(data: dict):
             print("[excellent‑candidates] body  :", res)
 
 async def post_excellence_reasons(data: dict):
-    # Oxirgi ExcellentCandidates obyektini topish
     sid = data["student_db_id"]
     async with aiohttp.ClientSession() as s:
         async with s.get(f"{DJANGO_API_URL}excellent-candidates/?student={sid}") as r:
@@ -260,7 +325,6 @@ async def post_weak_candidates(data: dict):
         "selected_groupmates": data["weak_selected"],
     }
     async with aiohttp.ClientSession() as s:
-        # TODO: endpoint nomini o‘zgartiring, agar boshqa bo‘lsa
         async with s.post(f"{DJANGO_API_URL}atrisk-candidates/", json=payload) as r:
             print("[failure‑candidates] status:", r.status)
             try:
@@ -272,7 +336,6 @@ async def post_weak_candidates(data: dict):
 async def post_weak_reasons(data: dict):
     sid = data["student_db_id"]
     async with aiohttp.ClientSession() as s:
-        # TODO: endpoint nomini o‘zgartiring
         async with s.get(f"{DJANGO_API_URL}atrisk-candidates/?student={sid}") as r:
             res = await r.json()
             cand_id = (res["results"][-1] if isinstance(res, dict) else res[-1])["id"]
