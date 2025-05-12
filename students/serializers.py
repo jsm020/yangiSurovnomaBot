@@ -14,11 +14,14 @@ class StudentSerializer(serializers.ModelSerializer):
             "course",
             "direction",
             "group",
+            "telegram_id",
         ]
 
 
 class ExcellentCandidatesSerializer(serializers.ModelSerializer):
-    selected_groupmates = StudentSerializer(many=True, read_only=True)
+    selected_groupmates = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Student.objects.all()
+    )
     class Meta:
         model = ExcellentCandidates
         fields = ["id", "student", "selected_groupmates", "created_at"]

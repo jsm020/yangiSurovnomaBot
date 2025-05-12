@@ -7,6 +7,7 @@ class Student(models.Model):
     group = models.CharField(max_length=50, verbose_name="Guruh")
     student_id = models.CharField(max_length=20, unique=True, verbose_name="Talaba ID")
     full_name = models.CharField(max_length=150, verbose_name="F.I.Sh.")
+    telegram_id = models.BigIntegerField(blank=True, null=True, verbose_name="Telegram ID")
 
     def __str__(self):
         return f"{self.full_name} ({self.student_id})"

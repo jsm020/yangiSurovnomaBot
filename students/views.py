@@ -1,11 +1,55 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+# API for updating Student's telegram_id by student_id
+class StudentTelegramIdUpdateView(APIView):
+    def post(self, request):
+        student_id = request.data.get("student_id")
+        telegram_id = request.data.get("telegram_id")
+        username = request.data.get("username")
+        full_name = request.data.get("full_name")
+        if not student_id or not telegram_id:
+            return Response({"error": "student_id va telegram_id majburiy"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            student = Student.objects.get(student_id=student_id)
+            student.telegram_id = telegram_id
+            if username:
+                student.username = username
+            if full_name:
+                student.full_name = full_name
+            student.save()
+            return Response(StudentSerializer(student).data)
+        except Student.DoesNotExist:
+            return Response({"error": "Bunday student_id topilmadi"}, status=status.HTTP_404_NOT_FOUND)
 from .models import (
     Student, ExcellentCandidates, ExcellenceReason, AtRiskCandidates, AtRiskReason
 )
 from .serializers import (
     StudentSerializer, ExcellentCandidatesSerializer, ExcellenceReasonSerializer, AtRiskCandidatesSerializer, AtRiskReasonSerializer
 )
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
+from rest_framework.views import APIView
+from rest_framework.response import Response
+class StudentTelegramIdUpdateView(APIView):
+    def post(self, request):
+        student_id = request.data.get("student_id")
+        telegram_id = request.data.get("telegram_id")
+        username = request.data.get("username")
+        full_name = request.data.get("full_name")
+        if not student_id or not telegram_id:
+            return Response({"error": "student_id va telegram_id majburiy"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            student = Student.objects.get(student_id=student_id)
+            student.telegram_id = telegram_id
+            if username is not None:
+                student.username = username
+            if full_name is not None:
+                student.full_name = full_name
+            student.save()
+            return Response(StudentSerializer(student).data)
+        except Student.DoesNotExist:
+            return Response({"error": "Bunday student_id topilmadi"}, status=status.HTTP_404_NOT_FOUND)
 class ExcellentCandidatesViewSet(viewsets.ModelViewSet):
     queryset = ExcellentCandidates.objects.all()
     serializer_class = ExcellentCandidatesSerializer

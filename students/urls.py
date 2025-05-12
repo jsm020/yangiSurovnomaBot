@@ -7,6 +7,7 @@ from .views import (
     ExcellenceReasonViewSet,
     AtRiskCandidatesViewSet,
     AtRiskReasonViewSet,
+    StudentTelegramIdUpdateView,
 )
 
 router = DefaultRouter()
@@ -17,5 +18,6 @@ router.register(r'atrisk-reasons', AtRiskReasonViewSet, basename='atrisk-reasons
 
 urlpatterns = [
     path('groupmates/<str:student_id>/', groupmates_by_student_id, name='groupmates-by-student-id'),
+    path('update-telegram-id/', StudentTelegramIdUpdateView.as_view(), name='update-telegram-id'),
 ]
 urlpatterns += router.urls
