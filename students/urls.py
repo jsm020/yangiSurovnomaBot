@@ -3,6 +3,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     SurveyParticipationView,
+    get_filter_options,
     student_filter_view,
     groupmates_by_student_id,
     ExcellentCandidatesViewSet,
@@ -26,6 +27,8 @@ urlpatterns = [
     path('list/', students_api, name='students_api'),  # Talabalar ro'yxati: /api/students/list/
     path('good_reasons/', good_reasons_api, name='good_reasons'),  # /api/students/good_reasons/
     path('weak_reasons/', weak_reasons_api, name='weak_reasons'),  # /api/students/weak_reasons/
+    path('filter-options/', get_filter_options, name='filter_options'),
+
     path("survey-participations/", SurveyParticipationView.as_view()),
     path('groupmates/<str:student_id>/', groupmates_by_student_id, name='groupmates-by-student-id'),
     path('update-telegram-id/', StudentTelegramIdUpdateView.as_view(), name='update-telegram-id'),

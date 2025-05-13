@@ -13,6 +13,10 @@
     select, input[type="text"], button { padding: 5px; }
     button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
     button:hover { background-color: #45a049; }
+    .student-header { cursor: pointer; padding: 10px; background: #f9f9f9; }
+    .student-details { padding: 10px; }
+    .results-table { margin-bottom: 20px; }
+    .fully-evaluated { background: #e0f7e0; }
   </style>
 </head>
 <body>
@@ -25,7 +29,8 @@
         {{ form.faculty }}
         {{ form.course }}
         {{ form.group }}
-        <button type="submit">🔍 Filtrlash</button>
+        <button type="submit" id="submitFilters">🔍 Filtrlash</button>
+        <button type="button" id="exportExcel">📁 Excelga eksport</button>
       </div>
       {% if messages %}
         {% for message in messages %}
@@ -36,6 +41,7 @@
     <div id="groupStats" class="stats hidden"></div>
     <div id="studentList"></div>
   </div>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script>
     let GOOD_REASONS = {};
     let WEAK_REASONS = {};
@@ -49,175 +55,330 @@
     const groupSelect = document.getElementById('id_group');
     const studentList = document.getElementById('studentList');
     const groupStats = document.getElementById('groupStats');
+    const submitFilters = document.getElementById('submitFilters');
+    const exportExcel = document.getElementById('exportExcel');
 
-    window.onload = async () => {
+    // Sabablarni yuklash funksiyasi
+    async function fetchReasons() {
+      try {
+        const [goodReasonsResponse, weakReasonsResponse] = await Promise.all([
+          fetch('/api/students/good_reasons/'),
+          fetch('/api/students/weak_reasons/')
+        ]);
+
+        console.log('Good reasons status:', goodReasonsResponse.status);
+        console.log('Good reasons headers:', goodReasonsResponse.headers.get('content-type'));
+        console.log('Weak reasons status:', weakReasonsResponse.status);
+        console.log('Weak reasons headers:', weakReasonsResponse.headers.get('content-type'));
+
+        if (!goodReasonsResponse.ok || !weakReasonsResponse.ok) {
+          const [goodText, weakText] = await Promise.all([
+            goodReasonsResponse.text(),
+            weakReasonsResponse.text()
+          ]);
+          throw new Error(
+            `Good reasons failed: ${goodReasonsResponse.status} - ${goodText}; ` +
+            `Weak reasons failed: ${weakReasonsResponse.status} - ${weakText}`
+          );
+        }
+
+        GOOD_REASONS = await goodReasonsResponse.json();
+        WEAK_REASONS = await weakReasonsResponse.json();
+      } catch (error) {
+        console.error("Error fetching reasons:", error);
+      }
+    }
+
+    // Fakultet va kurs bo‘yicha kurslar va guruhlar ro‘yxatini yangilash
+    async function updateFilterOptions(faculty, course = '') {
+      try {
+        const params = new URLSearchParams();
+        if (faculty) params.append('faculty', faculty);
+        if (course) params.append('course', course);
+
+        const response = await fetch(`/api/students/filter-options/?${params.toString()}`);
+        console.log('Filter options status:', response.status);
+        console.log('Filter options headers:', response.headers.get('content-type'));
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Filter options fetch failed: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        // Kurslarni yangilash (faqat fakultet o‘zgarganda)
+        if (!course) {
+          courseSelect.innerHTML = '<option value="">📘 Kurs</option>';
+          data.courses.forEach(course => {
+            courseSelect.add(new Option(course, course));
+          });
+        }
+
+        // Guruhlarni yangilash
+        groupSelect.innerHTML = '<option value="">👥 Guruh</option>';
+        data.groups.forEach(group => {
+          groupSelect.add(new Option(group, group));
+        });
+      } catch (error) {
+        console.error("Error fetching filter options:", error);
+      }
+    }
+
+    // Talabalar ro‘yxatini yuklash
+    async function fetchStudents() {
+      try {
+        const params = new URLSearchParams();
+        if (searchInput.value) params.append('search', searchInput.value);
+        if (facultySelect.value) params.append('faculty', facultySelect.value);
+        if (courseSelect.value) params.append('course', courseSelect.value);
+        if (groupSelect.value) params.append('group', groupSelect.value);
+
+        const response = await fetch(`/api/students/list/?${params.toString()}`, {
+          headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+          }
+        });
+
+        console.log('Students API status:', response.status);
+        console.log('Students API headers:', response.headers.get('content-type'));
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Students fetch failed: ${response.status} - ${errorText}`);
+        }
+
+        const studentsData = await response.json();
+        console.log("Fetched Students:", studentsData);
+
+        studentsRawData.length = 0;
+        studentsData.forEach(row => {
+          if (!row.faculty || !row.course || !row.group || !row.full_name) return;
+          studentsRawData.push({
+            faculty: row.faculty,
+            course: row.course.toString(),
+            group: row.group,
+            name: row.full_name,
+            evaluated: row.evaluated || false,
+            votes: row.votes || {},
+            excellent_votes: row.excellent_votes || 0,
+            atrisk_votes: row.atrisk_votes || 0
+          });
+        });
+      } catch (error) {
+        console.error("Error fetching students:", error);
+        studentList.innerHTML = `<p>❌ Talabalarni yuklashda xatolik yuz berdi: ${error.message}</p>`;
+      }
+    }
+
+    // Talabalar ro‘yxatini ko‘rsatish
+    function renderStudents() {
+      groupStats.className = 'stats hidden';
+      studentList.innerHTML = '';
+
+      const selectedGroup = groupSelect.value;
+      filteredStudents = studentsRawData;
+
+      if (filteredStudents.length === 0) {
+        studentList.innerHTML = '<p>❌ Hech qanday talaba topilmadi.</p>';
+        return;
+      }
+
+      // Guruh statistikasini hisoblash
+      if (selectedGroup) {
+        const groupStudents = studentsRawData.filter(s => s.group === selectedGroup);
+        const participated = groupStudents.filter(s => s.evaluated).length;
+        const percent = groupStudents.length ? ((participated / groupStudents.length) * 100).toFixed(1) : 0;
+        groupStats.innerHTML = `<p><strong>Guruh ishtiroki:</strong> ${percent}% (${participated}/${groupStudents.length})</p>`;
+        groupStats.className = 'stats';
+      }
+
+      // Har bir talaba uchun HTML yaratish
+      filteredStudents.forEach((student, index) => {
+        const div = document.createElement('div');
+        div.className = 'student';
+        div.innerHTML = `
+          <div class="student-header" data-index="${index}">
+            ${student.name} ${student.evaluated ? '✅' : ''}
+            <span class="votes-count">
+              (👍 ${student.excellent_votes} | 👎 ${student.atrisk_votes})
+            </span>
+          </div>
+          <div class="student-details hidden" id="student-${index}"></div>
+        `;
+        
+        if (student.evaluated) {
+          div.querySelector('.student-header').classList.add('fully-evaluated');
+        }
+        
+        studentList.appendChild(div);
+      });
+
+      // Talabalar detallarini yuklash
+      document.querySelectorAll('.student-header').forEach(header => {
+        header.onclick = async () => {
+          const index = header.getAttribute('data-index');
+          const box = document.getElementById(`student-${index}`);
+          const student = filteredStudents[index];
+          
+          header.classList.toggle('opened');
+          box.classList.toggle('hidden');
+
+          // Agar sabablar yuklanmagan bo‘lsa, yuklab olamiz
+          if (!Object.keys(GOOD_REASONS).length || !Object.keys(WEAK_REASONS).length) {
+            await fetchReasons();
+          }
+
+          const groupStudents = studentsRawData.filter(s => s.group === student.group);
+          const goodKeys = Object.keys(GOOD_REASONS);
+          const weakKeys = Object.keys(WEAK_REASONS);
+
+          // Ovozlarni hisoblash
+          let goodVotes = 0;
+          let weakVotes = 0;
+          for (const key of Object.keys(student.votes)) {
+            if (goodKeys.includes(key)) goodVotes += student.votes[key];
+            if (weakKeys.includes(key)) weakVotes += student.votes[key];
+          }
+
+          const totalInGroup = groupStudents.length;
+          const goodPercent = totalInGroup ? Math.min(((goodVotes / totalInGroup) * 100).toFixed(1), 100) : 0;
+          const weakPercent = totalInGroup ? Math.min(((weakVotes / totalInGroup) * 100).toFixed(1), 100) : 0;
+
+          // Jadval qatorini yaratish funksiyasi
+          const createRow = (data, allKeys) =>
+            `<tr>${allKeys.map(key => `<td>${data[key] || 0}</td>`).join('')}</tr>`;
+
+          // HTML generatsiya qilish
+          box.innerHTML = `
+            <div class="results-table">
+              <h4>✅ Yaxshi xususiyatlar</h4>
+              <p><strong>Boshqalar tomonidan tanlangan:</strong> ${goodPercent}% (${goodVotes}/${totalInGroup})</p>
+              <table>
+                <tr>${goodKeys.map(k => `<th>${GOOD_REASONS[k]}</th>`).join('')}</tr>
+                ${createRow(student.votes, goodKeys)}
+              </table>
+            </div>
+            <div class="results-table">
+              <h4>⚠️ Kuchsiz tomonlar</h4>
+              <p><strong>Boshqalar tomonidan tanlangan:</strong> ${weakPercent}% (${weakVotes}/${totalInGroup})</p>
+              <table>
+                <tr>${weakKeys.map(k => `<th>${WEAK_REASONS[k]}</th>`).join('')}</tr>
+                ${createRow(student.votes, weakKeys)}
+              </table>
+            </div>
+          `;
+        };
+      });
+    }
+
+    // Excelga eksport qilish funksiyasi
+    exportExcel.onclick = () => {
+      if (filteredStudents.length === 0) {
+        alert('❌ Avval filtrlab talabalarni tanlang.');
+        return;
+      }
+
+      const goodKeys = Object.keys(GOOD_REASONS);
+      const weakKeys = Object.keys(WEAK_REASONS);
+
+      // Sarlavhalar
+      const headers = [
+        ['№', 'Fakultet', 'Kurs', 'Guruh', 'F.I.O.', 'Yaxshi xususiyatlar', ...Array(goodKeys.length).fill(''), 'Jami yaxshi ovozlar', 'Kuchsiz tomonlar', ...Array(weakKeys.length).fill(''), 'Jami kuchsiz ovozlar'],
+        ['', '', '', '', '', ...goodKeys.map(key => GOOD_REASONS[key]), '', ...weakKeys.map(key => WEAK_REASONS[key]), '']
+      ];
+
+      // Ma'lumot qatorlari
+      const data = filteredStudents.map((student, index) => {
+        const goodVotes = goodKeys.reduce((sum, key) => sum + (student.votes[key] || 0), 0);
+        const weakVotes = weakKeys.reduce((sum, key) => sum + (student.votes[key] || 0), 0);
+        return [
+          index + 1, // №
+          student.faculty,
+          student.course,
+          student.group,
+          student.name,
+          ...goodKeys.map(key => student.votes[key] || 0),
+          goodVotes,
+          ...weakKeys.map(key => student.votes[key] || 0),
+          weakVotes
+        ];
+      });
+
+      // Sarlavhalar va ma'lumotlarni birlashtirish
+      const sheetData = [...headers, ...data];
+
+      // Worksheet yaratish
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+
+      // Sarlavhalarni birlashtirish
+      worksheet['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // №
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // Fakultet
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // Kurs
+        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // Guruh
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, // F.I.O.
+        { s: { r: 0, c: 5 }, e: { r: 0, c: 5 + goodKeys.length - 1 } }, // Yaxshi xususiyatlar
+        { s: { r: 0, c: 5 + goodKeys.length }, e: { r: 1, c: 5 + goodKeys.length } }, // Jami yaxshi ovozlar
+        { s: { r: 0, c: 6 + goodKeys.length }, e: { r: 0, c: 6 + goodKeys.length + weakKeys.length - 1 } }, // Kuchsiz tomonlar
+        { s: { r: 0, c: 6 + goodKeys.length + weakKeys.length }, e: { r: 1, c: 6 + goodKeys.length + weakKeys.length } } // Jami kuchsiz ovozlar
+      ];
+
+      // Ustun kengliklarini sozlash
+      worksheet['!cols'] = [
+        { wch: 5 }, // №
+        { wch: 20 }, // Fakultet
+        { wch: 10 }, // Kurs
+        { wch: 10 }, // Guruh
+        { wch: 30 }, // F.I.O.
+        ...goodKeys.map(() => ({ wch: 15 })), // Yaxshi xususiyatlar
+        { wch: 15 }, // Jami yaxshi ovozlar
+        ...weakKeys.map(() => ({ wch: 15 })), // Kuchsiz tomonlar
+        { wch: 15 } // Jami kuchsiz ovozlar
+      ];
+
+      // Workbook yaratish va faylni eksport qilish
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Talabalar');
+      XLSX.writeFile(workbook, `talabalar_statistikasi_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
+    // Fakultet tanlanganda kurslar va guruhlar ro‘yxatini yangilash
+    facultySelect.onchange = () => {
+      updateFilterOptions(facultySelect.value);
+      fetchStudents().then(() => renderStudents());
+    };
+
+    // Kurs tanlanganda guruhlar ro‘yxatini yangilash
+    courseSelect.onchange = () => {
+      updateFilterOptions(facultySelect.value, courseSelect.value);
+      fetchStudents().then(() => renderStudents());
+    };
+
+    // Guruh tanlanganda talabalar ro‘yxatini yangilash
+    groupSelect.onchange = () => {
+      fetchStudents().then(() => renderStudents());
+    };
+
+    // Qidiruv maydoniga matn kiritilganda talabalar ro‘yxatini yangilash
+    searchInput.oninput = () => {
+      fetchStudents().then(() => renderStudents());
+    };
+
+    // Forma yuborilganda sahifani qayta yuklamaslik uchun
+    form.onsubmit = async (e) => {
+      e.preventDefault();
       await fetchStudents();
       renderStudents();
     };
 
-    async function fetchStudents() {
-  try {
-    const params = new URLSearchParams();
-    if (searchInput.value) params.append('search', searchInput.value);
-    if (facultySelect.value) params.append('faculty', facultySelect.value);
-    if (courseSelect.value) params.append('course', courseSelect.value);
-    if (groupSelect.value) params.append('group', groupSelect.value);
-
-    // GET so'rovi yuboramiz
-    const response = await fetch(`/api/students/list?${params.toString()}`, {
-      headers: {
-        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Students fetch failed: ${response.status} - ${errorText}`);
-    }
-
-    const studentsData = await response.json();
-    console.log("Fetched Students:", studentsData);
-
-    studentsRawData.length = 0;
-    studentsData.forEach(row => {
-      studentsRawData.push({
-        faculty: row.faculty,
-        course: row.course,
-        group: row.group,
-        name: row.full_name,
-        evaluated: row.evaluated || false,
-        votes: row.votes || {},
-        excellent_votes: row.excellent_votes || 0,
-        atrisk_votes: row.atrisk_votes || 0
-      });
-    });
-    
-    renderStudents();
-  } catch (error) {
-    console.error("Error fetching students:", error);
-    studentList.innerHTML = `<p>❌ Talabalarni yuklashda xatolik yuz berdi: ${error.message}</p>`;
-  }
-}
-
-// Sabablarni yuklash funksiyasi
-async function fetchReasons() {
-  try {
-    const [goodReasonsResponse, weakReasonsResponse] = await Promise.all([
-      fetch('/api/students/good_reasons/'),
-      fetch('/api/students/weak_reasons/')
-    ]);
-
-    if (!goodReasonsResponse.ok || !weakReasonsResponse.ok) {
-      throw new Error('Failed to fetch reasons');
-    }
-
-    GOOD_REASONS = await goodReasonsResponse.json();
-    WEAK_REASONS = await weakReasonsResponse.json();
-  } catch (error) {
-    console.error("Error fetching reasons:", error);
-  }
-}
-
-// Talabalar ro'yxatini ko'rsatish funksiyasi
-function renderStudents() {
-  groupStats.className = 'stats hidden';
-  studentList.innerHTML = '';
-
-  const selectedGroup = groupSelect.value;
-  filteredStudents = studentsRawData;
-
-  if (filteredStudents.length === 0) {
-    studentList.innerHTML = '<p>❌ Hech qanday talaba topilmadi.</p>';
-    return;
-  }
-
-  // Guruh statistikasini hisoblash
-  if (selectedGroup) {
-    const groupStudents = studentsRawData.filter(s => s.group === selectedGroup);
-    const participated = groupStudents.filter(s => s.evaluated).length;
-    const percent = groupStudents.length ? ((participated / groupStudents.length) * 100).toFixed(1) : 0;
-    groupStats.innerHTML = `<p><strong>Guruh ishtiroki:</strong> ${percent}% (${participated}/${groupStudents.length})</p>`;
-    groupStats.className = 'stats';
-  }
-
-  // Har bir talaba uchun HTML yaratish
-  filteredStudents.forEach((student, index) => {
-    const div = document.createElement('div');
-    div.className = 'student';
-    div.innerHTML = `
-      <div class="student-header" data-index="${index}">
-        ${student.name} ${student.evaluated ? '✅' : ''}
-        <span class="votes-count">
-          (👍 ${student.excellent_votes} | 👎 ${student.atrisk_votes})
-        </span>
-      </div>
-      <div class="student-details hidden" id="student-${index}"></div>
-    `;
-    
-    if (student.evaluated) {
-      div.querySelector('.student-header').classList.add('fully-evaluated');
-    }
-    
-    studentList.appendChild(div);
-  });
-
-  // Talabalar detallarini yuklash
-  document.querySelectorAll('.student-header').forEach(header => {
-    header.onclick = async () => {
-      const index = header.getAttribute('data-index');
-      const box = document.getElementById(`student-${index}`);
-      const student = filteredStudents[index];
-      
-      header.classList.toggle('opened');
-      box.classList.toggle('hidden');
-
-      // Agar sabablar yuklanmagan bo'lsa, yuklab olamiz
-      if (!Object.keys(GOOD_REASONS).length || !Object.keys(WEAK_REASONS).length) {
-        await fetchReasons();
-      }
-
-      const groupStudents = studentsRawData.filter(s => s.group === student.group);
-      const goodKeys = Object.keys(GOOD_REASONS);
-      const weakKeys = Object.keys(WEAK_REASONS);
-
-      // Ovozlarni hisoblash
-      let goodVotes = 0;
-      let weakVotes = 0;
-      for (const key of Object.keys(student.votes)) {
-        if (goodKeys.includes(key)) goodVotes += student.votes[key];
-        if (weakKeys.includes(key)) weakVotes += student.votes[key];
-      }
-
-      const totalInGroup = groupStudents.length;
-      const goodPercent = totalInGroup ? Math.min(((goodVotes / totalInGroup) * 100).toFixed(1), 100) : 0;
-      const weakPercent = totalInGroup ? Math.min(((weakVotes / totalInGroup) * 100).toFixed(1), 100) : 0;
-
-      // Jadval qatorini yaratish funksiyasi
-      const createRow = (data, allKeys) =>
-        `<tr>${allKeys.map(key => `<td>${data[key] || 0}</td>`).join('')}</tr>`;
-
-      // HTML generatsiya qilish
-      box.innerHTML = `
-        <div class="results-table">
-          <h4>✅ Yaxshi xususiyatlar</h4>
-          <p><strong>Boshqalar tomonidan tanlangan:</strong> ${goodPercent}% (${goodVotes}/${totalInGroup})</p>
-          <table>
-            <tr>${goodKeys.map(k => `<th>${GOOD_REASONS[k]}</th>`).join('')}</tr>
-            ${createRow(student.votes, goodKeys)}
-          </table>
-        </div>
-        <div class="results-table">
-          <h4>⚠️ Kuchsiz tomonlar</h4>
-          <p><strong>Boshqalar tomonidan tanlangan:</strong> ${weakPercent}% (${weakVotes}/${totalInGroup})</p>
-          <table>
-            <tr>${weakKeys.map(k => `<th>${WEAK_REASONS[k]}</th>`).join('')}</tr>
-            ${createRow(student.votes, weakKeys)}
-          </table>
-        </div>
-      `;
+    // Sahifa yuklanganda boshlang‘ich ma'lumotlarni olish
+    window.onload = async () => {
+      await fetchReasons();
+      await fetchStudents();
+      await updateFilterOptions(''); // Boshlang‘ich kurslar va guruhlar ro‘yxatini yuklash
+      renderStudents();
     };
-  });
-}
   </script>
 </body>
 </html>

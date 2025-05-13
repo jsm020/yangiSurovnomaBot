@@ -20,6 +20,7 @@ from django.shortcuts import render
 from .forms import StudentFilterForm
 from .models import Student, ExcellenceReason, AtRiskReason
 from django.http import JsonResponse
+from django.db import models
 
 def student_filter_view(request):
     form = StudentFilterForm()
@@ -54,7 +55,7 @@ def good_reasons_api(request):
 def weak_reasons_api(request):
     reasons = dict(AtRiskReason.REASON_CHOICES)
     return JsonResponse(reasons)
-from django.db import models
+
 def students_api(request):
     try:
         # Talabalarni annotatsiya qilamiz (evaluated holatini aniqlash uchun)
@@ -133,7 +134,41 @@ def students_api(request):
         return JsonResponse(students_data, safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-# Boshqa ko'rinishlar (SurveyParticipationView, student_reasons_report va h.k.) o'zgarishsiz qoladi
+
+def get_filter_options(request):
+    faculty = request.GET.get('faculty', '')
+    course = request.GET.get('course', '')
+    response_data = {}
+
+    # Fakultet va kurs asosida filtrlar
+    students = Student.objects.all()
+
+    if faculty:
+        students = students.filter(faculty=faculty)
+    
+    # Noyob kurslar
+    courses = students.values('course').distinct()
+    response_data['courses'] = [course['course'] for course in courses]
+
+    # Guruhlar: agar kurs tanlangan bo‘lsa, faqat o‘sha kursga tegishli guruhlar
+    if course:
+        students = students.filter(course=course)
+    
+    groups = students.values('group').distinct()
+    response_data['groups'] = [group['group'] for group in groups]
+
+    return JsonResponse(response_data)
+
+
+
+
+
+
+
+
+
+
+
 
 
 class SurveyParticipationView(generics.ListCreateAPIView):  # List+Create
