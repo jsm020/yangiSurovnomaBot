@@ -121,17 +121,14 @@ class StudentTelegramIdUpdateView(APIView):
     def post(self, request):
         student_id = request.data.get("student_id")
         telegram_id = request.data.get("telegram_id")
-        username = request.data.get("username")
-        full_name = request.data.get("full_name")
+        telegram_user_name = request.data.get("telegram_user_name")
         if not student_id or not telegram_id:
             return Response({"error": "student_id va telegram_id majburiy"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             student = Student.objects.get(student_id=student_id)
             student.telegram_id = telegram_id
-            if username is not None:
-                student.username = username
-            if full_name:
-                student.full_name = full_name
+            if telegram_user_name is not None:
+                student.telegram_user_name = telegram_user_name
             student.save()
             return Response(StudentSerializer(student).data)
         except Student.DoesNotExist:
