@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Talabalarni Baholash</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'style.css' %}" />
+  <style>
+    .filters { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+    .stats { margin-top: 10px; }
+    .hidden { display: none; }
+    select, input[type="text"], button { padding: 5px; }
+    button { background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #45a049; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Talabalarni Baholash</h1>
+    <form method="post" action="" id="filterForm">
+      {% csrf_token %}
+      <div class="filters">
+        {{ form.search }}
+        {{ form.faculty }}
+        {{ form.course }}
+        {{ form.group }}
+        <button type="submit">🔍 Filtrlash</button>
+      </div>
+      {% if messages %}
+        {% for message in messages %}
+          <p style="color: red;">{{ message }}</p>
+        {% endfor %}
+      {% endif %}
+    </form>
+    <div id="groupStats" class="stats hidden"></div>
+    <div id="studentList"></div>
+  </div>
+  <script>
+    let GOOD_REASONS = {};
+    let WEAK_REASONS = {};
+    const studentsRawData = [];
+    let filteredStudents = [];
+
+    const form = document.getElementById('filterForm');
+    const searchInput = document.getElementById('id_search');
+    const facultySelect = document.getElementById('id_faculty');
+    const courseSelect = document.getElementById('id_course');
+    const groupSelect = document.getElementById('id_group');
+    const studentList = document.getElementById('studentList');
+    const groupStats = document.getElementById('groupStats');
+
+    window.onload = async () => {
+      await fetchStudents();
+      renderStudents();
+    };
+
+    async function fetchStudents() {
+  try {
+    const params = new URLSearchParams();
+    if (searchInput.value) params.append('search', searchInput.value);
+    if (facultySelect.value) params.append('faculty', facultySelect.value);
+    if (courseSelect.value) params.append('course', courseSelect.value);
+    if (groupSelect.value) params.append('group', groupSelect.value);
+
+    // GET so'rovi yuboramiz
+    const response = await fetch(`/api/students/list?${params.toString()}`, {
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Students fetch failed: ${response.status} - ${errorText}`);
+    }
+
+    const studentsData = await response.json();
+    console.log("Fetched Students:", studentsData);
+
+    studentsRawData.length = 0;
+    studentsData.forEach(row => {
+      studentsRawData.push({
+        faculty: row.faculty,
+        course: row.course,
+        group: row.group,
+        name: row.full_name,
+        evaluated: row.evaluated || false,
+        votes: row.votes || {},
+        excellent_votes: row.excellent_votes || 0,
+        atrisk_votes: row.atrisk_votes || 0
+      });
+    });
+    
+    renderStudents();
+  } catch (error) {
+    console.error("Error fetching students:", error);
+    studentList.innerHTML = `<p>❌ Talabalarni yuklashda xatolik yuz berdi: ${error.message}</p>`;
+  }
+}
+
+// Sabablarni yuklash funksiyasi
+async function fetchReasons() {
+  try {
+    const [goodReasonsResponse, weakReasonsResponse] = await Promise.all([
+      fetch('/api/students/good_reasons/'),
+      fetch('/api/students/weak_reasons/')
+    ]);
+
+    if (!goodReasonsResponse.ok || !weakReasonsResponse.ok) {
+      throw new Error('Failed to fetch reasons');
+    }
+
+    GOOD_REASONS = await goodReasonsResponse.json();
+    WEAK_REASONS = await weakReasonsResponse.json();
+  } catch (error) {
+    console.error("Error fetching reasons:", error);
+  }
+}
+
+// Talabalar ro'yxatini ko'rsatish funksiyasi
+function renderStudents() {
+  groupStats.className = 'stats hidden';
+  studentList.innerHTML = '';
+
+  const selectedGroup = groupSelect.value;
+  filteredStudents = studentsRawData;
+
+  if (filteredStudents.length === 0) {
+    studentList.innerHTML = '<p>❌ Hech qanday talaba topilmadi.</p>';
+    return;
+  }
+
+  // Guruh statistikasini hisoblash
+  if (selectedGroup) {
+    const groupStudents = studentsRawData.filter(s => s.group === selectedGroup);
+    const participated = groupStudents.filter(s => s.evaluated).length;
+    const percent = groupStudents.length ? ((participated / groupStudents.length) * 100).toFixed(1) : 0;
+    groupStats.innerHTML = `<p><strong>Guruh ishtiroki:</strong> ${percent}% (${participated}/${groupStudents.length})</p>`;
+    groupStats.className = 'stats';
+  }
+
+  // Har bir talaba uchun HTML yaratish
+  filteredStudents.forEach((student, index) => {
+    const div = document.createElement('div');
+    div.className = 'student';
+    div.innerHTML = `
+      <div class="student-header" data-index="${index}">
+        ${student.name} ${student.evaluated ? '✅' : ''}
+        <span class="votes-count">
+          (👍 ${student.excellent_votes} | 👎 ${student.atrisk_votes})
+        </span>
+      </div>
+      <div class="student-details hidden" id="student-${index}"></div>
+    `;
+    
+    if (student.evaluated) {
+      div.querySelector('.student-header').classList.add('fully-evaluated');
+    }
+    
+    studentList.appendChild(div);
+  });
+
+  // Talabalar detallarini yuklash
+  document.querySelectorAll('.student-header').forEach(header => {
+    header.onclick = async () => {
+      const index = header.getAttribute('data-index');
+      const box = document.getElementById(`student-${index}`);
+      const student = filteredStudents[index];
+      
+      header.classList.toggle('opened');
+      box.classList.toggle('hidden');
+
+      // Agar sabablar yuklanmagan bo'lsa, yuklab olamiz
+      if (!Object.keys(GOOD_REASONS).length || !Object.keys(WEAK_REASONS).length) {
+        await fetchReasons();
+      }
+
+      const groupStudents = studentsRawData.filter(s => s.group === student.group);
+      const goodKeys = Object.keys(GOOD_REASONS);
+      const weakKeys = Object.keys(WEAK_REASONS);
+
+      // Ovozlarni hisoblash
+      let goodVotes = 0;
+      let weakVotes = 0;
+      for (const key of Object.keys(student.votes)) {
+        if (goodKeys.includes(key)) goodVotes += student.votes[key];
+        if (weakKeys.includes(key)) weakVotes += student.votes[key];
+      }
+
+      const totalInGroup = groupStudents.length;
+      const goodPercent = totalInGroup ? Math.min(((goodVotes / totalInGroup) * 100).toFixed(1), 100) : 0;
+      const weakPercent = totalInGroup ? Math.min(((weakVotes / totalInGroup) * 100).toFixed(1), 100) : 0;
+
+      // Jadval qatorini yaratish funksiyasi
+      const createRow = (data, allKeys) =>
+        `<tr>${allKeys.map(key => `<td>${data[key] || 0}</td>`).join('')}</tr>`;
+
+      // HTML generatsiya qilish
+      box.innerHTML = `
+        <div class="results-table">
+          <h4>✅ Yaxshi xususiyatlar</h4>
+          <p><strong>Boshqalar tomonidan tanlangan:</strong> ${goodPercent}% (${goodVotes}/${totalInGroup})</p>
+          <table>
+            <tr>${goodKeys.map(k => `<th>${GOOD_REASONS[k]}</th>`).join('')}</tr>
+            ${createRow(student.votes, goodKeys)}
+          </table>
+        </div>
+        <div class="results-table">
+          <h4>⚠️ Kuchsiz tomonlar</h4>
+          <p><strong>Boshqalar tomonidan tanlangan:</strong> ${weakPercent}% (${weakVotes}/${totalInGroup})</p>
+          <table>
+            <tr>${weakKeys.map(k => `<th>${WEAK_REASONS[k]}</th>`).join('')}</tr>
+            ${createRow(student.votes, weakKeys)}
+          </table>
+        </div>
+      `;
+    };
+  });
+}
+  </script>
+</body>
+</html>

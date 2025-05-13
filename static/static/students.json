@@ -1,0 +1,26 @@
+[
+  {
+    "faculty": "Fakultet1",
+    "course": "1",
+    "group": "Guruh1",
+    "name": "Ali Valiev",
+    "evaluated": true,
+    "votes": { "responsibility": 1, "difficulty": 1 }
+  },
+  {
+    "faculty": "Fakultet1",
+    "course": "1",
+    "group": "Guruh1",
+    "name": "Vali Aliev",
+    "evaluated": false,
+    "votes": { "hardwork": 1 }
+  },
+  {
+    "faculty": "Fakultet2",
+    "course": "2",
+    "group": "Guruh2",
+    "name": "Sardor Sobirov",
+    "evaluated": false,
+    "votes": {}
+  }
+]

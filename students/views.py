@@ -14,6 +14,128 @@ from rest_framework import generics, permissions
 from .models import SurveyParticipation
 from .serializers import SurveyParticipationSerializer
 
+
+# -----------------------------------------------------------------------
+from django.shortcuts import render
+from .forms import StudentFilterForm
+from .models import Student, ExcellenceReason, AtRiskReason
+from django.http import JsonResponse
+
+def student_filter_view(request):
+    form = StudentFilterForm()
+    students = Student.objects.all()
+
+    if request.method == 'POST':
+        form = StudentFilterForm(request.POST)
+        if form.is_valid():
+            search = form.cleaned_data['search']
+            faculty = form.cleaned_data['faculty']
+            course = form.cleaned_data['course']
+            group = form.cleaned_data['group']
+            students = Student.objects.all()
+            if search:
+                students = students.filter(full_name__icontains=search.strip())
+            if faculty:
+                students = students.filter(faculty=faculty)
+            if course:
+                students = students.filter(course=course)
+            if group:
+                students = students.filter(group=group)
+
+    return render(request, 'report/index.html', {
+        'form': form,
+        'students': students
+    })
+
+def good_reasons_api(request):
+    reasons = dict(ExcellenceReason.REASON_CHOICES)
+    return JsonResponse(reasons)
+
+def weak_reasons_api(request):
+    reasons = dict(AtRiskReason.REASON_CHOICES)
+    return JsonResponse(reasons)
+from django.db import models
+def students_api(request):
+    try:
+        # Talabalarni annotatsiya qilamiz (evaluated holatini aniqlash uchun)
+        students = Student.objects.annotate(
+            evaluated=models.Exists(
+                SurveyParticipation.objects.filter(student_id=models.OuterRef('pk'))
+            )
+        )
+        
+        # GET yoki POST so'rovlarni qabul qilish
+        if request.method == 'GET':
+            params = request.GET
+        elif request.method == 'POST':
+            params = request.POST
+        else:
+            return JsonResponse({'error': 'Method not allowed'}, status=405)
+        
+        # Filtirlash parametrlari
+        search = params.get('search', '').strip()
+        faculty = params.get('faculty', '')
+        course = params.get('course', '')
+        group = params.get('group', '')
+
+        if search:
+            students = students.filter(full_name__icontains=search)
+        if faculty:
+            students = students.filter(faculty=faculty)
+        if course:
+            students = students.filter(course=course)
+        if group:
+            students = students.filter(group=group)
+
+        students_data = []
+        for student in students:
+            # 1. A'lochi talabalar uchun ovozlarni hisoblash
+            excellent_votes = ExcellentCandidates.objects.filter(
+                selected_groupmates=student
+            ).count()
+            
+            # 2. Xavf ostidagi talabalar uchun ovozlarni hisoblash
+            atrisk_votes = AtRiskCandidates.objects.filter(
+                selected_groupmates=student
+            ).count()
+            
+            # 3. Sabablar bo'yicha ovozlarni yig'amiz
+            votes = {}
+            
+            # A'lochi sabablari
+            excellent_reasons = ExcellenceReason.objects.filter(
+                candidate__selected_groupmates=student
+            ).values('reason').annotate(count=models.Count('reason'))
+            
+            for item in excellent_reasons:
+                votes[item['reason']] = item['count']
+            
+            # Xavf sabablari
+            atrisk_reasons = AtRiskReason.objects.filter(
+                candidate__selected_groupmates=student
+            ).values('reason').annotate(count=models.Count('reason'))
+            
+            for item in atrisk_reasons:
+                votes[item['reason']] = item['count']
+
+            students_data.append({
+                'student_id': student.student_id,
+                'full_name': student.full_name,
+                'faculty': student.faculty,
+                'course': student.course,
+                'group': student.group,
+                'evaluated': student.evaluated,
+                'votes': votes,
+                'excellent_votes': excellent_votes,
+                'atrisk_votes': atrisk_votes,
+            })
+
+        return JsonResponse(students_data, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+# Boshqa ko'rinishlar (SurveyParticipationView, student_reasons_report va h.k.) o'zgarishsiz qoladi
+
+
 class SurveyParticipationView(generics.ListCreateAPIView):  # List+Create
     serializer_class   = SurveyParticipationSerializer
     permission_classes = [permissions.AllowAny]
@@ -32,43 +154,6 @@ class SurveyParticipationView(generics.ListCreateAPIView):  # List+Create
             qs = qs.filter(telegram_id=telegram_id)
 
         return qs
-
-def student_reasons_report(request):
-    students = Student.objects.annotate(
-        selected_count=Count('excellent_candidates')
-    )
-
-    # Barcha sabab kalitlarini olamiz
-    all_reason_keys = [key for key, _ in ExcellenceReason.REASON_CHOICES]
-    reason_dict = dict(ExcellenceReason.REASON_CHOICES)
-
-    student_data = []
-
-    for student in students:
-        # Shu student qaysi so‘rovda tanlangan
-        candidates = ExcellentCandidates.objects.filter(selected_groupmates=student)
-
-        # Ular bilan bog‘liq sabablar
-        reasons_qs = ExcellenceReason.objects.filter(candidate__in=candidates)
-
-        # Har bir sababdan nechtaligini sanash
-        reason_counter = Counter(reasons_qs.values_list('reason', flat=True))
-
-        # Har bir sabab uchun 0 yoki haqiqiy sonni qo‘yamiz
-        full_reason_stats = {
-            reason_dict[key]: reason_counter.get(key, 0)
-            for key in all_reason_keys
-        }
-
-        student_data.append({
-            'student': student,
-            'selected_count': student.selected_count,
-            'reasons': full_reason_stats,
-        })
-
-    return render(request, 'report/student_reasons_report.html', {
-        'student_data': student_data
-    })
 
 class StudentTelegramIdUpdateView(APIView):
     def post(self, request):
