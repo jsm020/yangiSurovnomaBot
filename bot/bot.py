@@ -13,15 +13,15 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ──────────────── Konstanta va tokenlar ────────────────
-API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN",
-                      "7912014686:AAF0oVi8Yma9qr4IiuSMEQ2gkCRDJ8wr5BI")
-DJANGO_API_URL = os.getenv("DJANGO_API_URL",
-                           "http://localhost:8000/api/students/")
+
+from dotenv import load_dotenv
+import pathlib
+load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
+
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000/api/students/")
 # ➕ SurveyParticipation endpointi
-SURVEY_API_URL = os.getenv(
-    "SURVEY_API_URL",
-    "http://localhost:8000/api/students/survey-participations/"
-)
+SURVEY_API_URL = os.getenv("SURVEY_API_URL", DJANGO_API_URL + "survey-participations/")
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
