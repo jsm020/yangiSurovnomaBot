@@ -195,13 +195,26 @@
 
       // Har bir talaba uchun HTML yaratish
       filteredStudents.forEach((student, index) => {
+        // Подсчёт голосов и проголосовавших
+        const goodKeys = Object.keys(GOOD_REASONS);
+        const weakKeys = Object.keys(WEAK_REASONS);
+
+        // Сумма голосов за хорошие качества
+        const excellentTotal = goodKeys.reduce((sum, key) => sum + (student.votes[key] || 0), 0);
+        // Количество студентов, проголосовавших за хорошие качества
+        const excellentVoters = goodKeys.some(key => (student.votes[key] || 0) > 0) ? 1 : 0;
+        // Сумма голосов за слабые стороны
+        const atriskTotal = weakKeys.reduce((sum, key) => sum + (student.votes[key] || 0), 0);
+        // Количество студентов, проголосовавших за слабые стороны
+        const atriskVoters = weakKeys.some(key => (student.votes[key] || 0) > 0) ? 1 : 0;
+
         const div = document.createElement('div');
         div.className = 'student';
         div.innerHTML = `
           <div class="student-header" data-index="${index}">
             ${student.name} ${student.evaluated ? '✅' : ''}
             <span class="votes-count">
-              (👍 ${student.excellent_votes} | 👎 ${student.atrisk_votes})
+              (👍 ${excellentTotal} | 👎 ${atriskTotal} (👤${excellentVoters}|👤${atriskVoters}))
             </span>
           </div>
           <div class="student-details hidden" id="student-${index}"></div>
@@ -282,62 +295,139 @@
       const goodKeys = Object.keys(GOOD_REASONS);
       const weakKeys = Object.keys(WEAK_REASONS);
 
-      // Sarlavhalar
+      // Формируем заголовки, как в примере
       const headers = [
-        ['№', 'Fakultet', 'Kurs', 'Guruh', 'F.I.O.', 'Yaxshi xususiyatlar', ...Array(goodKeys.length).fill(''), 'Jami yaxshi ovozlar', 'Kuchsiz tomonlar', ...Array(weakKeys.length).fill(''), 'Jami kuchsiz ovozlar'],
-        ['', '', '', '', '', ...goodKeys.map(key => GOOD_REASONS[key]), '', ...weakKeys.map(key => WEAK_REASONS[key]), '']
+        [
+          '№', 'Fakultet', 'Kurs', 'Guruh', 'F.I.O.',
+          'Yaxshi xususiyatlar', ...Array(goodKeys.length - 1).fill(''), '',
+          'Kuchsiz tomonlar', ...Array(weakKeys.length - 1).fill(''), ''
+        ],
+        [
+          '', '', '', '', '',
+          ...goodKeys.map(key => GOOD_REASONS[key]), 'Jami ovozlar',
+          ...weakKeys.map(key => WEAK_REASONS[key]), 'Jami ovozlar'
+        ]
       ];
 
-      // Ma'lumot qatorlari
+      // Формируем данные
       const data = filteredStudents.map((student, index) => {
-        const goodVotes = goodKeys.reduce((sum, key) => sum + (student.votes[key] || 0), 0);
-        const weakVotes = weakKeys.reduce((sum, key) => sum + (student.votes[key] || 0), 0);
+        // Подсчитываем, проголосовал ли кто-то за хорошие качества (1 или 0)
+        const goodVoters = goodKeys.some(key => (student.votes[key] || 0) > 0) ? 1 : 0;
+        // Подсчитываем, проголосовал ли кто-то за слабые стороны (1 или 0)
+        const weakVoters = weakKeys.some(key => (student.votes[key] || 0) > 0) ? 1 : 0;
         return [
-          index + 1, // №
+          index + 1,
           student.faculty,
           student.course,
           student.group,
           student.name,
           ...goodKeys.map(key => student.votes[key] || 0),
-          goodVotes,
+          goodVoters,
           ...weakKeys.map(key => student.votes[key] || 0),
-          weakVotes
+          weakVoters
         ];
       });
 
-      // Sarlavhalar va ma'lumotlarni birlashtirish
+      // Объединяем заголовки и данные
       const sheetData = [...headers, ...data];
 
-      // Worksheet yaratish
+      // Создаём лист
       const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
 
-      // Sarlavhalarni birlashtirish
+      // Определяем объединение ячеек, как в примере
       worksheet['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // №
-        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // Fakultet
-        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // Kurs
-        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // Guruh
-        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, // F.I.O.
-        { s: { r: 0, c: 5 }, e: { r: 0, c: 5 + goodKeys.length - 1 } }, // Yaxshi xususiyatlar
-        { s: { r: 0, c: 5 + goodKeys.length }, e: { r: 1, c: 5 + goodKeys.length } }, // Jami yaxshi ovozlar
-        { s: { r: 0, c: 6 + goodKeys.length }, e: { r: 0, c: 6 + goodKeys.length + weakKeys.length - 1 } }, // Kuchsiz tomonlar
-        { s: { r: 0, c: 6 + goodKeys.length + weakKeys.length }, e: { r: 1, c: 6 + goodKeys.length + weakKeys.length } } // Jami kuchsiz ovozlar
+        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }, // № (A1:A2)
+        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } }, // Fakultet (B1:B2)
+        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } }, // Kurs (C1:C2)
+        { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } }, // Guruh (D1:D2)
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } }, // F.I.O. (E1:E2)
+        { s: { r: 0, c: 5 }, e: { r: 0, c: 5 + goodKeys.length } }, // Yaxshi xususiyatlar
+        { s: { r: 0, c: 6 + goodKeys.length }, e: { r: 0, c: 6 + goodKeys.length + weakKeys.length } } // Kuchsiz tomonlar
       ];
 
-      // Ustun kengliklarini sozlash
-      worksheet['!cols'] = [
+      // Минимальные ширины столбцов (увеличены для качеств и Jami ovozlar)
+      const minColWidths = [
         { wch: 5 }, // №
         { wch: 20 }, // Fakultet
         { wch: 10 }, // Kurs
         { wch: 10 }, // Guruh
         { wch: 30 }, // F.I.O.
-        ...goodKeys.map(() => ({ wch: 15 })), // Yaxshi xususiyatlar
-        { wch: 15 }, // Jami yaxshi ovozlar
-        ...weakKeys.map(() => ({ wch: 15 })), // Kuchsiz tomonlar
-        { wch: 15 } // Jami kuchsiz ovozlar
+        ...goodKeys.map(() => ({ wch: 20 })), // Yaxshi xususiyatlar
+        { wch: 20 }, // Jami ovozlar (хорошие)
+        ...weakKeys.map(() => ({ wch: 20 })), // Kuchsiz tomonlar
+        { wch: 20 } // Jami ovozlar (слабые)
       ];
 
-      // Workbook yaratish va faylni eksport qilish
+      // Автоматическое определение ширины столбцов
+      const colWidths = [];
+      sheetData.forEach(row => {
+        row.forEach((cell, colIndex) => {
+          const cellValue = cell ? cell.toString() : '';
+          const cellLength = cellValue.length * 1.2; // Учитываем ширину кириллических символов
+          colWidths[colIndex] = Math.max(colWidths[colIndex] || 0, cellLength);
+        });
+      });
+
+      // Устанавливаем ширину столбцов с учётом минимальных значений
+      worksheet['!cols'] = colWidths.map((width, i) => ({
+        wch: Math.max(minColWidths[i].wch, width + 4) // Увеличенный отступ
+      }));
+
+      // Логирование ширин столбцов для отладки
+      console.log('Column Widths:', worksheet['!cols'].map(col => col.wch));
+
+      // Применяем стили к ячейкам
+      const range = XLSX.utils.decode_range(worksheet['!ref']);
+      for (let row = range.s.r; row <= range.e.r; row++) {
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+
+          // Создаём ячейку, если она не существует
+          if (!worksheet[cellAddress]) {
+            worksheet[cellAddress] = { t: 's', v: '' };
+          }
+
+          // Определяем стили
+          const isFaculty = col === 1; // Fakultet (B)
+          const isFIO = col === 4; // F.I.O. (E)
+          const isHeader = row < 2; // Первые две строки
+          const isNumberColumn = col === 0; // Столбец № (A)
+
+          worksheet[cellAddress].s = {
+            alignment: {
+              halign: isFaculty || isFIO ? 'right' : 'center',
+              valign: 'center',
+              wrapText: true
+            },
+            border: {
+              top: { style: 'thin', color: { rgb: '000000' } },
+              bottom: { style: 'thin', color: { rgb: '000000' } },
+              left: { style: 'thin', color: { rgb: '000000' } },
+              right: { style: 'thin', color: { rgb: '000000' } }
+            }
+          };
+
+          // Жирный шрифт для заголовков и столбца №
+          if (isHeader || isNumberColumn) {
+            worksheet[cellAddress].s.font = { bold: true };
+          }
+
+          // Светло-серая заливка для заголовков
+          if (isHeader) {
+            worksheet[cellAddress].s.fill = {
+              patternType: 'solid',
+              fgColor: { rgb: 'D3D3D3' }
+            };
+          }
+        }
+      }
+
+      // Логирование стилей для отладки
+      console.log('Sample Cell Style (A1):', worksheet['A1']?.s);
+      console.log('Sample Cell Style (B3):', worksheet['B3']?.s);
+      console.log('Sample Cell Style (C3):', worksheet['C3']?.s);
+
+      // Создаём книгу и экспортируем файл
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Talabalar');
       XLSX.writeFile(workbook, `talabalar_statistikasi_${new Date().toISOString().slice(0, 10)}.xlsx`);
