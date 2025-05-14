@@ -1,92 +1,110 @@
-yangiSurovnomaBot
-🎓 yangiSurovnomaBot — bu Django asosida ishlab chiqilgan veb-ilova bo‘lib, talabalar bilan ishlashni avtomatlashtirish va Telegram orqali interaktiv so‘rovlar o‘tkazish imkonini beradi. Ilova asinxron ishlashni ta'minlaydi va Docker yordamida konteynerlashtirilgan.
+# yangiSurovnomaBot
 
-🧰 Texnologiyalar
-Backend: Django 4.x, Django REST Framework
+🗳️ Django + Telegram asosida ishlovchi so‘rovnoma va auksion bot
 
-Bot: Python Telegram Bot
+---
 
-ASGI Server: Uvicorn
+## 📌 Loyiha haqida
 
-Ma'lumotlar bazasi: PostgreSQL
+**yangiSurovnomaBot** — bu Django backend va Telegram bot asosida ishlab chiqilgan tizim bo‘lib, foydalanuvchilar o‘rtasida interaktiv auksion yoki so‘rovlar o‘tkazishga mo‘ljallangan. Har bir mahsulot Telegram kanalida post qilinadi, foydalanuvchilar bot orqali ishtirok etadi, narxlar real vaqtda yangilanadi va g‘olib avtomatik aniqlanadi.
 
-Konteynerlash: Docker, Docker Compose
+---
 
-Yordamchi vositalar: Gunicorn, dotenv
+## ⚙️ Texnologiyalar
 
-📁 Loyiha tuzilmasi
-bash
-Copy
-Edit
+- **Django 4.x** — backend framework
+- **PostgreSQL** — ma'lumotlar bazasi
+- **Telegram Bot API** — foydalanuvchi interfeysi
+- **Docker / Docker Compose** — deploy va izolyatsiya
+- **ASGI (Uvicorn)** — asinxron ishlash uchun
+- **Gunicorn** — ishlab chiqarish muhitida server
+
+---
+
+## 📁 Loyihaning tuzilmasi
+
+```
 yangiSurovnomaBot/
 ├── bot/                  # Telegram bot kodi
-├── config/               # Django konfiguratsiyasi (ASGI, sozlamalar)
-├── students/             # Talabalar bilan ishlash uchun ilova
-├── static/               # Statik fayllar (CSS, JS, rasm)
-├── media/                # Yuklangan fayllar (rasmlar, hujjatlar)
-├── templates/            # HTML shablonlar
-├── Dockerfile            # Docker tasviri uchun fayl
+├── config/               # Django konfiguratsiyasi
+├── students/             # Talabalar (foydalanuvchilar) ilovasi
+├── static/               # CSS, JS, rasm fayllari
+├── media/                # Yuklangan fayllar (rasm, video)
+├── Dockerfile            # Docker tasvir konfiguratsiyasi
 ├── docker-compose.yml    # Xizmatlarni boshqarish
 ├── requirements.txt      # Python kutubxonalari ro‘yxati
-└── .env                  # Muhit o‘zgaruvchilari
-🚀 Ishga tushirish
-1. Muhit o‘zgaruvchilarini sozlash
-Loyihaning ildiz papkasida .env faylini yarating va quyidagi o‘zgaruvchilarni belgilang:
+└── .env                  # Muhit sozlamalari
+```
 
-env
-Copy
-Edit
+---
+
+## 🚀 Ishga tushirish
+
+### 1. `.env` fayl yaratish
+
+Ildiz papkada `.env` fayl yarating:
+
+```env
 DEBUG=True
-SECRET_KEY=your-secret-key
-DATABASE_URL=postgres://user:password@db:5432/dbname
+SECRET_KEY=your_secret_key
 ALLOWED_HOSTS=localhost,127.0.0.1
-2. Docker yordamida ishga tushirish
-bash
-Copy
-Edit
-# Tasvirlarni qurish
+DATABASE_URL=postgres://user:password@localhost:5432/dbname
+```
+
+### 2. Docker yordamida ishga tushiring
+
+```bash
 docker-compose build
-
-# Xizmatlarni ishga tushirish
 docker-compose up
-3. Ma'lumotlar bazasini migratsiya qilish
-Agar kerak bo‘lsa, quyidagi buyruqlarni bajarib, ma'lumotlar bazasini sozlang:
+```
 
-bash
-Copy
-Edit
-docker-compose exec web python manage.py makemigrations
+### 3. Ma'lumotlar bazasini sozlang
+
+```bash
 docker-compose exec web python manage.py migrate
-4. Superfoydalanuvchi yaratish
-Admin panelga kirish uchun superfoydalanuvchi yarating:
-
-bash
-Copy
-Edit
 docker-compose exec web python manage.py createsuperuser
-5. Statik fayllarni yig‘ish
-bash
-Copy
-Edit
+```
+
+### 4. Statik fayllarni yig‘ing
+
+```bash
 docker-compose exec web python manage.py collectstatic --noinput
-📡 API va Bot
-API Endpoint: http://localhost:8000/api/students/
+```
 
-Admin Panel: http://localhost:8000/admin/
+---
 
-Telegram Bot: bot/bot.py faylida joylashgan
+## 📡 URL’lar
 
-🐳 Docker Compose xizmatlari
-web: Django ilovasi, Uvicorn orqali ishlaydi
+- Admin panel: [http://localhost:8000/admin/](http://localhost:8000/admin/)
+- API: [http://localhost:8000/api/students/](http://localhost:8000/api/students/)
+- Bot kodi: `bot/bot.py` faylida
 
-bot: Telegram bot, bot/bot.py faylidan ishga tushadi
+---
 
-🧪 Testlar
-Testlarni ishga tushirish uchun quyidagi buyruqni bajaring:
+## 🤖 Bot funksiyalari
 
-bash
-Copy
-Edit
+- Telegram kanalga auksion mahsulotini post qilish
+- Har bir post tagida botga olib boruvchi referral (deep link)
+- Ishtirokchilar narx taklif qilishlari mumkin
+- Har bir yangilangan narx barcha ishtirokchilarga yuboriladi
+- Har bir bid uchun taymer (masalan, 5 daqiqa) ishlaydi
+- Vaqt tugasa, g‘olib avtomatik aniqlanadi
+
+---
+
+## 🧪 Test
+
+```bash
 docker-compose exec web python manage.py test
-📄 Litsenziya
-Ushbu loyiha MIT litsenziyasi ostida tarqatiladi.
+```
+
+---
+
+## 📜 Litsenziya
+
+Ushbu loyiha MIT litsenziyasi asosida tarqatiladi. Istalgan tarzda foydalanish va o‘zgartirish mumkin.
+
+---
+
+👨‍💻 **Muallif**: [@jsm020](https://github.com/jsm020)  
+📅 **Yaratilgan sana**: 2025-yil
