@@ -1,56 +1,92 @@
-# yangiSurovnomaBot
+yangiSurovnomaBot
+🎓 yangiSurovnomaBot — bu Django asosida ishlab chiqilgan veb-ilova bo‘lib, talabalar bilan ishlashni avtomatlashtirish va Telegram orqali interaktiv so‘rovlar o‘tkazish imkonini beradi. Ilova asinxron ishlashni ta'minlaydi va Docker yordamida konteynerlashtirilgan.
 
-## Loyihaning qisqacha tavsifi
-Bu loyiha Django va Django REST Framework asosida qurilgan bo‘lib, talabalar va ularning guruhdoshlari haqidagi so‘rovnomalarni boshqarish uchun API, admin panel va Telegram botni taqdim etadi. Frontend qismi esa talabalarni filtrlash, baholash va statistikani ko‘rish uchun HTML/CSS/JS yordamida yaratilgan.
+🧰 Texnologiyalar
+Backend: Django 4.x, Django REST Framework
 
-## O‘rnatish
-1. Virtual muhit yarating va faollashtiring:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-2. Kerakli kutubxonalarni o‘rnating:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Migratsiyalarni bajaring:
-   ```bash
-   python manage.py migrate
-   ```
-4. Superuser yarating (ixtiyoriy, admin panel uchun):
-   ```bash
-   python manage.py createsuperuser
-   ```
+Bot: Python Telegram Bot
 
-## Ishga tushirish
-```bash
-python manage.py runserver
-```
+ASGI Server: Uvicorn
 
-## Telegram botni ishga tushirish
-```bash
-cd bot
-python bot.py
-```
+Ma'lumotlar bazasi: PostgreSQL
 
-## API endpointlar
-- `GET/POST /api/students/groupmates/<student_id>/` — Guruhdoshlarni olish
-- `GET/POST /api/students/excellent-candidates/` — A'lochi nomzodlar
-- `GET/POST /api/students/excellence-reasons/` — A'lochi sabablari
-- `GET/POST /api/students/atrisk-candidates/` — Xavf ostidagi nomzodlar
-- `GET/POST /api/students/atrisk-reasons/` — Xavf sabablari
-- `GET /api/students/list/` — Talabalar ro‘yxati (filtrlash uchun)
-- `GET /api/students/good_reasons/` — Yaxshi xususiyatlar ro‘yxati
-- `GET /api/students/weak_reasons/` — Kuchsiz tomonlar ro‘yxati
-- `GET /api/students/filter-options/` — Filtr variantlari (fakultet, kurs, guruh)
-- `POST /api/students/update-telegram-id/` — Telegram ID yangilash
+Konteynerlash: Docker, Docker Compose
 
-## Frontend
-- `templates/report/index.html` — Talabalarni filtrlash, baholash va statistikani ko‘rish uchun sahifa.
-- `static/style.css` — Sahifa uchun uslublar.
+Yordamchi vositalar: Gunicorn, dotenv
 
-## Talablar
-`requirements.txt` faylida ko‘rsatilgan.
+📁 Loyiha tuzilmasi
+bash
+Copy
+Edit
+yangiSurovnomaBot/
+├── bot/                  # Telegram bot kodi
+├── config/               # Django konfiguratsiyasi (ASGI, sozlamalar)
+├── students/             # Talabalar bilan ishlash uchun ilova
+├── static/               # Statik fayllar (CSS, JS, rasm)
+├── media/                # Yuklangan fayllar (rasmlar, hujjatlar)
+├── templates/            # HTML shablonlar
+├── Dockerfile            # Docker tasviri uchun fayl
+├── docker-compose.yml    # Xizmatlarni boshqarish
+├── requirements.txt      # Python kutubxonalari ro‘yxati
+└── .env                  # Muhit o‘zgaruvchilari
+🚀 Ishga tushirish
+1. Muhit o‘zgaruvchilarini sozlash
+Loyihaning ildiz papkasida .env faylini yarating va quyidagi o‘zgaruvchilarni belgilang:
 
-## Muallif
-- [Loyihani ishlab chiquvchi haqida ma'lumot kiriting]
+env
+Copy
+Edit
+DEBUG=True
+SECRET_KEY=your-secret-key
+DATABASE_URL=postgres://user:password@db:5432/dbname
+ALLOWED_HOSTS=localhost,127.0.0.1
+2. Docker yordamida ishga tushirish
+bash
+Copy
+Edit
+# Tasvirlarni qurish
+docker-compose build
+
+# Xizmatlarni ishga tushirish
+docker-compose up
+3. Ma'lumotlar bazasini migratsiya qilish
+Agar kerak bo‘lsa, quyidagi buyruqlarni bajarib, ma'lumotlar bazasini sozlang:
+
+bash
+Copy
+Edit
+docker-compose exec web python manage.py makemigrations
+docker-compose exec web python manage.py migrate
+4. Superfoydalanuvchi yaratish
+Admin panelga kirish uchun superfoydalanuvchi yarating:
+
+bash
+Copy
+Edit
+docker-compose exec web python manage.py createsuperuser
+5. Statik fayllarni yig‘ish
+bash
+Copy
+Edit
+docker-compose exec web python manage.py collectstatic --noinput
+📡 API va Bot
+API Endpoint: http://localhost:8000/api/students/
+
+Admin Panel: http://localhost:8000/admin/
+
+Telegram Bot: bot/bot.py faylida joylashgan
+
+🐳 Docker Compose xizmatlari
+web: Django ilovasi, Uvicorn orqali ishlaydi
+
+bot: Telegram bot, bot/bot.py faylidan ishga tushadi
+
+🧪 Testlar
+Testlarni ishga tushirish uchun quyidagi buyruqni bajaring:
+
+bash
+Copy
+Edit
+docker-compose exec web python manage.py test
+📄 Litsenziya
+Ushbu loyiha MIT litsenziyasi ostida tarqatiladi.
