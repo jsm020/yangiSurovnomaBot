@@ -4,6 +4,7 @@ services:
     command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000
     volumes:
       - .:/app
+      - static_volume:/app/staticfiles  # 🔥 static fayllar saqlanadigan joy
     ports:
       - "8000:8000"
     env_file:
@@ -22,6 +23,9 @@ services:
     networks:
       - app-network
     
+
+volumes:
+  static_volume:  # 🔥 volume e’lon qilinadi
 networks:
   app-network:
     driver: bridge
