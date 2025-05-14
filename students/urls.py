@@ -29,7 +29,7 @@ urlpatterns = [
     path('weak_reasons/', weak_reasons_api, name='weak_reasons'),  # /api/students/weak_reasons/
     path('filter-options/', get_filter_options, name='filter_options'),
 
-    path("survey-participations/", SurveyParticipationView.as_view()),
+    path("survey-participations/", SurveyParticipationView.as_view(), name='survey-participations'),
     path('groupmates/<str:student_id>/', groupmates_by_student_id, name='groupmates-by-student-id'),
     path('update-telegram-id/', StudentTelegramIdUpdateView.as_view(), name='update-telegram-id'),
 ]

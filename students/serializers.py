@@ -16,6 +16,7 @@ class StudentSerializer(serializers.ModelSerializer):
             "direction",
             "group",
             "telegram_id",
+            'telegram_user_name',
         ]
 
 
