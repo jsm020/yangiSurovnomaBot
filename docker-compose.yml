@@ -1,0 +1,33 @@
+services:
+  web:
+    build: .
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - app-network
+  bot:
+    build: .
+    command: python bot/bot.py
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - web
+    networks:
+      - app-network
+    
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
